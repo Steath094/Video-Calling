@@ -2,14 +2,14 @@ import { useEffect, useRef,useCallback } from 'react';
 import {useSocket} from '../providers/Socket'
 import { useNavigate } from 'react-router-dom';
 
-function Home() {
+function Home({ setMyStream }: { setMyStream: (stream: MediaStream) => void }) {
   const emailRef = useRef<HTMLInputElement>(null);
   const roomRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const socket = useSocket();
-  const handleRoomJoined = ({ roomId }: { roomId: string }) => {
+  const handleRoomJoined = useCallback( ({ roomId }: { roomId: string }) => {
     navigate(`/room/${roomId}`)
-  }
+  },[navigate])
   useEffect(() => {
     socket?.on('joined-room',handleRoomJoined)
     return ()=>{
@@ -17,12 +17,30 @@ function Home() {
 
     }
   }, [handleRoomJoined,socket]);
-  const handleJoinRoom = useCallback( () =>{
-    console.log(emailRef.current?.value);
-    console.log(roomRef.current?.value);
+  const handleJoinRoom = useCallback( async () =>{
+    const emailId = emailRef.current?.value;
+    const roomId = roomRef.current?.value;
+
+    if (!emailId || !roomId) {
+      alert("Please enter both email and room code.");
+      return;
+    }
     
-    socket?.emit('join-room',{emailId: emailRef.current?.value,roomId:roomRef.current?.value})
-  },[])
+    try {
+      // 1. Get media stream first
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: true,
+      });
+      // 2. Set the stream in the parent App component
+      setMyStream(stream);
+      // 3. Emit the join-room event
+      socket?.emit('join-room', { emailId, roomId });
+    } catch (error) {
+      console.error("Failed to get media stream:", error);
+      alert("Could not access camera and microphone.");
+    }
+  }, [socket, setMyStream]);
   return (
     <div className="w-screen h-screen flex justify-center items-center ">
         <div className="flex flex-col h-screen justify-center items-center gap-4 ">

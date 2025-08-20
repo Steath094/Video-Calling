@@ -21,7 +21,7 @@ export const PeerProvider = (props:any) => {
             {
                 urls: [
                     "stun:stun.l.google.com:19302",
-                    "stun:google.stun.twilo.com:3478"
+                    "stun:google.stun.twilio.com:3478"
                 ]
             }
         ]
@@ -41,12 +41,23 @@ export const PeerProvider = (props:any) => {
     const setRemoteAnswer = async (ans:any) =>{
         await peer.setRemoteDescription(ans);
     }
-    const sendStream = async (stream:MediaStream)=>{
+    const sendStream = useCallback(async (stream: MediaStream) => {
         const tracks = stream.getTracks();
-        for(const track of tracks){
-            peer.addTrack(track,stream);
+        for (const track of tracks) {
+            // Find if a sender already exists for this track's kind (audio or video)
+            const sender = peer.getSenders().find(s => s.track?.kind === track.kind);
+            
+            if (sender) {
+                // If a sender exists, replace its track. This is safe to call multiple times.
+                console.log(`Replacing track for kind: ${track.kind}`);
+                await sender.replaceTrack(track);
+            } else {
+                // If no sender exists for this kind, add the track.
+                console.log(`Adding track for kind: ${track.kind}`);
+                peer.addTrack(track, stream);
+            }
         }
-    }
+    }, [peer]);
     const handleTrackEvent = useCallback((ev:RTCTrackEvent)=>{
             const stream = ev.streams;
             setRemoteStream(stream[0])
