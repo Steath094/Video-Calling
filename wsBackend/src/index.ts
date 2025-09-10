@@ -38,9 +38,19 @@ wss.on("connection",(socket)=>{
             })
         }
         console.log("Rooms: ",rooms);
-
     })
-    
+    socket.on("close",()=>{
+        rooms.forEach(room=>{
+            if(room.has(socket)){
+                room.delete(socket);
+                room.forEach(s=>{
+                    s.send(JSON.stringify({
+                        type: "leave"
+                    }))
+                })
+            }
+        })
+    })
 })
 
 
