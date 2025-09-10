@@ -16,28 +16,47 @@ let init = async () =>{
     localStream = await navigator.mediaDevices.getUserMedia({video:true,audio:false});
     document.getElementById('user-1').srcObject = localStream;
     
-    socket.send(JSON.stringify({ type: 'JOIN', roomId: "1" }));
+    socket.send(JSON.stringify({ type: 'Join', roomId: "1" }));
     socket.onmessage = async event =>{
         const parsedData = JSON.parse(event.data)
-        if (parsedData.type=="JOINED") {
-            console.log("New user Joined");
+        if (parsedData.type=="Joined") {
+            handleNewUserJoined();
+        }
+        if(parsedData.type=="MessageFromPeer"){
+            console.log(parsedData);
             
-            // handleNewUserJoined(parsedData.socket);
+            handleMessageFromPeer(parsedData);
         }
     }
+}
+
+let handleMessageFromPeer = async (parsedData) =>{
+    if (parsedData.msgType=="offer") {
+        createAnswer(parsedData.offer)
+    }
+    if (parsedData.msgType=="answer") {
+        addAnswer(parsedData.answer)
+    }
+    if (parsedData.msgType=="candidate") {
+        if (peerConnection) {
+            peerConnection.addIceCandidate(parsedData.candidate)
+        }
+    }
+}
+let handleNewUserJoined = ()=>{
     createOffer();
 }
 
-
-let handleNewUserJoined = ()=>{
-
-}
-let createOffer = async () =>{
+let createPeerConnection = async () => {
     peerConnection = new RTCPeerConnection();
 
     remoteStream = new MediaStream();
     document.getElementById('user-2').srcObject = remoteStream;
 
+    if (!localStream) {
+        localStream = await navigator.mediaDevices.getUserMedia({video:true,audio:false});
+        document.getElementById('user-1').srcObject = localStream;
+    }
     localStream.getTracks().forEach((track)=>{
         peerConnection.addTrack(track,localStream)
     })
@@ -50,16 +69,34 @@ let createOffer = async () =>{
 
     peerConnection.onicecandidate = async (event) =>{
         if (event.candidate) {
-            console.log('New Ice Candidate: ', event.candidate);
+            socket.send(JSON.stringify({ type: 'Message', roomId: "1", msgType: "candidate",candidate: event.candidate }));
             
         }
     }
+}
 
+let createOffer = async () =>{
+    await createPeerConnection();
     let offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
-
-    console.log("offer ", offer);
+    socket.send(JSON.stringify({ type: 'Message', roomId: "1", msgType: "offer",offer }));
     
 }
 
+let createAnswer = async (offer) => {    
+    await createPeerConnection();
+
+    await peerConnection.setRemoteDescription(offer)
+
+    let answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+    socket.send(JSON.stringify({ type: 'Message', roomId: "1", msgType: "answer",answer }));
+
+}
+
+let addAnswer = async (answer) => {
+    if (!peerConnection.currentRemoteDescription) {
+        peerConnection.setRemoteDescription(answer);
+    }
+} 
 init();

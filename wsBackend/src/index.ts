@@ -7,7 +7,7 @@ wss.on("connection",(socket)=>{
     socket.on("message",(data:string)=>{
         const parsedData = JSON.parse(data)
         const { roomId } = parsedData;
-        if (parsedData.type=="JOIN") {
+        if (parsedData.type=="Join") {
             console.log("working");
             
             if (!rooms.has(roomId)) {
@@ -24,9 +24,16 @@ wss.on("connection",(socket)=>{
             rooms.get(roomId)?.forEach(s=>{
                 if(s!=socket){
                     s.send(JSON.stringify({
-                        type: "JOINED",
-                        socket
+                        type: "Joined",
                     }))
+                }
+            })
+        }
+        if (parsedData.type=="Message") {
+            rooms.get(roomId)?.forEach(s=>{
+                if(s!=socket){
+                    parsedData.type= "MessageFromPeer"
+                    s.send(JSON.stringify(parsedData))
                 }
             })
         }
