@@ -1,4 +1,4 @@
-const socket = new WebSocket(`https://video-calling-npqe.onrender.com`);
+const socket = new WebSocket(`ws://ec2-15-206-167-199.ap-south-1.compute.amazonaws.com:8080`);
 
 let localStream;
 let remoteStream;
