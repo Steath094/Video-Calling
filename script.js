@@ -4,6 +4,14 @@ let localStream;
 let remoteStream;
 let peerConnection;
 
+let queryString = window.location.search
+let urlParams = new URLSearchParams(queryString)
+let roomId = urlParams.get('room')
+
+
+if(!roomId){
+    window.location = `lobby.html`
+}
 const servers  = {
     iceServers: [
         {
@@ -12,11 +20,21 @@ const servers  = {
     ]
 }
 
+
+
+let contraints = {
+    video: {
+        width: {mid:640, ideal: 1280, max: 1280},
+        hieght: {min:480,ideal: 720, max: 720}
+    },
+    audio: true
+}
+
 let init = async () =>{
-    localStream = await navigator.mediaDevices.getUserMedia({video:true,audio:false});
+    localStream = await navigator.mediaDevices.getUserMedia(contraints);
     document.getElementById('user-1').srcObject = localStream;
     
-    socket.send(JSON.stringify({ type: 'Join', roomId: "1" }));
+    socket.send(JSON.stringify({ type: 'Join', roomId }));
     socket.onmessage = async event =>{
         const parsedData = JSON.parse(event.data)
         if (parsedData.type=="Joined") {
@@ -27,9 +45,16 @@ let init = async () =>{
             
             handleMessageFromPeer(parsedData);
         }
+        if(parsedData.type=="leave"){
+            handleUserLeft();
+        }
     }
 }
+let handleUserLeft = () =>{
+    document.getElementById("user-2").style.display="none"
+    document.getElementById('user-1').classList.remove("smallFrame")
 
+}
 let handleMessageFromPeer = async (parsedData) =>{
     if (parsedData.msgType=="offer") {
         createAnswer(parsedData.offer)
@@ -52,9 +77,10 @@ let createPeerConnection = async () => {
 
     remoteStream = new MediaStream();
     document.getElementById('user-2').srcObject = remoteStream;
-
+    document.getElementById('user-2').style.display ='block'
+    document.getElementById('user-1').classList.add("smallFrame")
     if (!localStream) {
-        localStream = await navigator.mediaDevices.getUserMedia({video:true,audio:false});
+        localStream = await navigator.mediaDevices.getUserMedia(contraints);
         document.getElementById('user-1').srcObject = localStream;
     }
     localStream.getTracks().forEach((track)=>{
@@ -69,7 +95,7 @@ let createPeerConnection = async () => {
 
     peerConnection.onicecandidate = async (event) =>{
         if (event.candidate) {
-            socket.send(JSON.stringify({ type: 'Message', roomId: "1", msgType: "candidate",candidate: event.candidate }));
+            socket.send(JSON.stringify({ type: 'Message', roomId, msgType: "candidate",candidate: event.candidate }));
             
         }
     }
@@ -79,7 +105,7 @@ let createOffer = async () =>{
     await createPeerConnection();
     let offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
-    socket.send(JSON.stringify({ type: 'Message', roomId: "1", msgType: "offer",offer }));
+    socket.send(JSON.stringify({ type: 'Message', roomId, msgType: "offer",offer }));
     
 }
 
@@ -90,7 +116,7 @@ let createAnswer = async (offer) => {
 
     let answer = await peerConnection.createAnswer();
     await peerConnection.setLocalDescription(answer);
-    socket.send(JSON.stringify({ type: 'Message', roomId: "1", msgType: "answer",answer }));
+    socket.send(JSON.stringify({ type: 'Message', roomId, msgType: "answer",answer }));
 
 }
 
@@ -99,4 +125,31 @@ let addAnswer = async (answer) => {
         peerConnection.setRemoteDescription(answer);
     }
 } 
+
+
+let toggleCamera = () =>{
+    let vidoeTrack = localStream.getTracks().find(track=> track.kind === "video")
+
+    if (vidoeTrack.enabled) {
+        vidoeTrack.enabled =false;
+        document.getElementById('camera-btn').style.backgroundColor = 'rgb(255,80,80)'
+    }else{
+         vidoeTrack.enabled =true;
+        document.getElementById('camera-btn').style.backgroundColor = 'rgb(179,102,249,.9)'
+    }
+}
+
+let toggleMic = () =>{
+    let audioTrack = localStream.getTracks().find(track=> track.kind === "audio")
+
+    if (audioTrack.enabled) {
+        audioTrack.enabled =false;
+        document.getElementById('mic-btn').style.backgroundColor = 'rgb(255,80,80)'
+    }else{
+         audioTrack.enabled =true;
+        document.getElementById('mic-btn').style.backgroundColor = 'rgb(179,102,249,.9)'
+    }
+}
+document.getElementById('camera-btn').addEventListener("click",toggleCamera);
+document.getElementById('mic-btn').addEventListener("click",toggleMic);
 init();
